@@ -15,6 +15,7 @@ ESP32-S3 7inch Capacitive Touch Display Development Board, ESP32 With Display, 8
 
 ## Code
 Complete example **[waveshare-esp32-s3-7inch.yaml](waveshare-esp32-s3-7inch.yaml)**
+Probably not nearly as optimal as you could do, but it seems to do the job as indented. 
 
 ## Credit
 This is based on work from [DMonkey-hub](https://github.com/DMonkey-hub/esphome/tree/main)
