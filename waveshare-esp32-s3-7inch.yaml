@@ -1,0 +1,1025 @@
+substitutions: 
+  device_internal_name: waveshare-7inch
+  device_friendly_name: Waveshare 7inch
+  friendly_devicename: Waveshare 7inch
+  friendly_name: Waveshare 7inch
+  device_sampling_time: 30s
+
+
+### Board Configuration
+esphome:
+  name: ${device_internal_name}
+  friendly_name: ${device_friendly_name}
+  platformio_options:
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.arduino.memory_type: qio_opi
+    board_build.flash_mode: dio
+    board_upload.maximum_ram_size: 524288
+
+psram:
+  mode: octal
+  speed: 120MHz
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: ESP32S3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      COMPILER_OPTIMIZATION_SIZE: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: "y"
+      CONFIG_FREERTOS_HZ: "1000"
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240: y
+      CONFIG_ESPTOOLPY_FLASHMODE_QIO: y
+      CONFIG_ESPTOOLPY_FLASHFREQ_120M: y
+      CONFIG_SPIRAM_MODE_OCT: y
+      CONFIG_IDF_EXPERIMENTAL_FEATURES: y
+      CONFIG_SPIRAM_SPEED_120M: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+
+i2c:
+  sda: GPIO08
+  scl: GPIO09
+  scan: True
+  id: bus_a
+
+### Enable logging
+logger:
+
+### Enable Home Assistant API
+api:
+  encryption:
+    key: "01234567891011121314151617181920212223242526"
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Waveshare-Esp32-S3-7Inch"
+    password: !secret ota_password
+
+captive_portal:
+
+### Web Server
+# web_server:
+#   port: 80
+#   version: 2
+#   include_internal: true
+#   auth:
+#     username: !secret web_server_user
+#     password: !secret web_server_password
+#   local: true
+
+### IO Extender
+ch422g:
+  - id: ch422g_hub
+
+### Switch
+switch:
+  - platform: restart
+    name: "Restart"
+    id: device_restart
+  
+  - platform: safe_mode
+    name: Use Safe Mode
+    id: device_safe_mode
+    
+  - platform: gpio
+    id: lcdbacklight
+    name: lcdbacklight
+    pin:
+      ch422g: ch422g_hub
+      number: 2
+      mode:
+        output: true
+      inverted: false
+    restore_mode: ALWAYS_ON
+
+  - platform: template
+    name: Antiburn
+    id: switch_antiburn
+    icon: mdi:television-shimmer
+    optimistic: true
+    entity_category: "config"
+    turn_on_action:
+      - logger.log: "Starting Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+      - lvgl.pause:
+          show_snow: true
+    turn_off_action:
+      - logger.log: "Stopping Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+
+### Time
+time:
+  - platform: homeassistant
+    id: esptime
+    on_time:
+      - minutes: "*"
+        then:
+          - lvgl.label.update:
+              id: time_hour
+              text:
+                time_format: "%A %H:%M"
+                time: !lambda return id(esptime).now();
+
+  - platform: homeassistant
+    id: antiburn_time
+    on_time:
+      - hours: 2,3,4,5
+        minutes: 5
+        seconds: 0
+        then:
+          - switch.turn_on: switch_antiburn
+          - switch.turn_off: lcdbacklight
+      - hours: 2,3,4,5
+        minutes: 35
+        seconds: 0
+        then:
+          - switch.turn_off: switch_antiburn
+      - hours: 5
+        minutes: 50
+        seconds: 0
+        then:
+          - switch.turn_on: lcdbacklight
+
+### Sensors
+sensor:
+  ## WiFi
+  - platform: wifi_signal
+    name: $friendly_devicename signal strength
+    id: wifi_signal_sensor
+    update_interval: 120s
+
+  ## Uptime
+  - platform: uptime
+    name: $friendly_devicename run time
+    id: uptime_sensor
+    update_interval: 120s
+    type: seconds
+
+  ## Indoor temperature
+  - platform: homeassistant
+    id: indoor_temperature
+    entity_id: climate.climate_system_s1
+    attribute: current_temperature
+    on_value:
+      - lvgl.label.update:
+          id: indoor_temperature_text
+          text:
+            format: "%.1f °C"
+            args: [ 'x' ]
+
+  ## Outdoor temperature
+  - platform: homeassistant
+    id: outdoor_temperature
+    entity_id: sensor.outdoor_temperature
+    on_value:
+      - lvgl.label.update:
+          id: outdoor_temperature_text
+          text:
+            format: "%.1f °C"
+            args: [ 'x' ]
+
+  ## Nordpool
+  - platform: homeassistant
+    id: nordpool_price
+    entity_id: sensor.nordpool_spot
+    on_value:
+      - lvgl.label.update:
+          id: nordpool_text
+          text:
+            format: "%.0f öre/kWh"
+            args: [ 'x' ]
+
+  ## Power usage
+  - platform: homeassistant
+    id: momentary_active_import
+    entity_id: sensor.momentary_active_import_w
+    on_value:
+      - lvgl.label.update:
+          id: momentary_active_import_text
+          text:
+            format: "%.0f W"
+            args: [ 'x' ]
+
+  ## Degree minutes (heat demand in the house)
+  - platform: homeassistant
+    id: degree_minutes
+    entity_id: number.degree_minutes_16_bit_43005
+    on_value:
+      - lvgl.label.update:
+          id: degree_minutes_text
+          text:
+            format: "%.0f DM"
+            args: [ 'x' ]
+
+  ## Water temperature hot water tank
+  - platform: homeassistant
+    id: water_temperature
+    entity_id: sensor.bt7_hw_top_40013
+    on_value:
+      - lvgl.label.update:
+          id: water_temp_text
+          text:
+            format: "%.1f °C"
+            args: [ 'x' ]
+
+  ## NOT IN USE ##
+  # Climate control
+  # - platform: homeassistant
+  #   id: room_thermostat
+  #   entity_id: climate.climate_system_s1
+  #   attribute: temperature
+  #   on_value:
+  #     - lvgl.spinbox.update:
+  #         id: spinbox_id
+  #         value: !lambda return x;
+
+### Binary sensors
+binary_sensor:
+ ## Status used for weather status 
+  - platform: status
+    name: Status sensor
+
+  - platform: homeassistant
+    id: binary_s_bathtub
+    entity_id: binary_sensor.extra_hot_water_active
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: btn_bathtub
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    id: binary_outdoor_lights
+    entity_id: light.outdoor_lights
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: btn_outdoor_lights
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    id: car_heater_switch
+    entity_id: switch.carport_car_heater
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: btn_car_heater
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    id: modbus_alarm
+    entity_id: binary_sensor.alarm_45001
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.led.update:
+          id: led_modbus_alarm
+          color: my_green
+
+### Text sensors ## Not used
+# text_sensor:
+#   - platform: wifi_info
+#     ip_address:
+#       name: IP Address
+#       id: ip_address
+#     ssid:
+#       name: Connected SSID
+#       id: connected_ssid
+#     mac_address:
+#       name: Mac Wifi Address
+#       id: mac_address
+
+###Text sensors for weather status
+text:
+  - platform: lvgl
+    name: fr_cond_icon
+    widget: lbl_weather_forecast_condition_icon
+    mode: text
+  - platform: lvgl
+    name: fr_cond_name
+    widget: lbl_weather_forecast_condition_name
+    mode: text
+
+### Images
+image:
+  - file: "images/background.png"
+    id: background
+    # resize: 480x320
+    type: RGB565
+
+### Colors
+color:
+  - id: my_red
+    red: 100%
+    green: 0%
+    blue: 0%
+  - id: my_pink
+    red: 100%
+    green: 10%
+    blue: 40%
+  - id: my_yellow
+    red: 100%
+    green: 100%
+    blue: 0%
+  - id: my_green
+    red: 0%
+    green: 100%
+    blue: 0%
+  - id: my_blue
+    red: 0%
+    green: 0%
+    blue: 100%
+  - id: my_gray
+    red: 50%
+    green: 50%
+    blue: 50%
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+  - id: my_black
+    red: 0%
+    green: 0%
+    blue: 0%
+
+### Fonts
+font:
+  - file: "fonts/RobotoCondensed-Regular.ttf"
+    id: roboto_56
+    size: 56
+    bpp: 4
+    glyphsets:
+      - GF_Latin_Core
+    extras:
+      - file: "fonts/materialdesignicons-webfont.ttf"
+        glyphs: [
+          "\U000F050F", # thermometer
+          "\U000F10C3", # thermometer low
+          "\U000F10C2", # thermometer high
+          "\U000F192D", # grid import
+          "\U000F02D1", # mdi-heart
+          "\U000F05F1", # ev-station
+          "\U000F140B", # lightning bolt
+          "\U000F0425", # power
+          "\U000F068A", # shield-home
+          "\U000F02DC", # home
+          "\U000F1A91", # cash-clock
+          "\U000F0F55", # home-thermometer-outline
+          "\U000F18D6", # sun-thermometer
+          "\U000F1819", # bathtub-outline
+          "\U000F1818", # bathtub
+          "\U000F1A44", # heat-pump-outline
+          "\U000F0335", # lightbulb
+          "\U000F0336", # lightbulb_off
+          "\U000F0769", # ceiling_light
+          "\U000F06B5", # lamp   
+          "\U000F08DD", # floor_lamp   
+          "\U000F12BA", # string_lights  
+          "\U000F0914", # track_light 
+          "\U000F1A2F", # bulkhead_light 
+          "\U000F07D6", # led_strip
+          "\U000F1020", # coach_lamp
+          "\U000F1798", # ceiling_fan_light
+          "\U000F0FA6", # car-seat-heater
+          "\U000F0594", # weather-night
+          "\U000F1054", # outdoor-lamp 
+          "\U000F1A85", # water-thermometer
+          ]
+
+  - file: "fonts/RobotoCondensed-Regular.ttf"
+    id: roboto_46
+    size: 46
+    bpp: 4
+    glyphsets:
+      - GF_Latin_Core
+    extras:
+      - file: "fonts/materialdesignicons-webfont.ttf"
+        glyphs: [
+          "\U000F050F", # thermometer
+          "\U000F10C3", # thermometer low
+          "\U000F10C2", # thermometer high
+          "\U000F192D", # grid import
+          "\U000F02D1", # mdi-heart
+          "\U000F05F1", # ev-station
+          "\U000F140B", # lightning bolt
+          "\U000F0425", # power
+          "\U000F068A", # shield-home
+          "\U000F02DC", # home
+          "\U000F1A91", # cash-clock
+          "\U000F0F55", # home-thermometer-outline
+          "\U000F18D6", # sun-thermometer
+          "\U000F1819", # bathtub-outline
+          "\U000F1818", # bathtub
+          "\U000F1A44", # heat-pump-outline
+          "\U000F0335", # lightbulb
+          "\U000F0336", # lightbulb_off
+          "\U000F0769", # ceiling_light
+          "\U000F06B5", # lamp   
+          "\U000F08DD", # floor_lamp   
+          "\U000F12BA", # string_lights  
+          "\U000F0914", # track_light 
+          "\U000F1A2F", # bulkhead_light 
+          "\U000F07D6", # led_strip
+          "\U000F1020", # coach_lamp
+          "\U000F1798", # ceiling_fan_light
+          "\U000F0FA6", # car-seat-heater
+          "\U000F0594", # weather-night
+          "\U000F1054", # outdoor-lamp 
+          "\U000F1A85", # water-thermometer
+          ]
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: icons_100
+    size: 100
+    bpp: 4
+    glyphs: [
+      "\U000F0594", # clear-night
+      "\U000F0590", # cloudy
+      "\U000F0F2F", # exceptional
+      "\U000F0591", # fog
+      "\U000F0592", # hail
+      "\U000F0593", # lightning
+      "\U000F067E", # lightning-rainy
+      "\U000F0595", # partlycloudy
+      "\U000F0596", # pouring
+      "\U000F0597", # rainy
+      "\U000F0598", # snowy
+      "\U000F067F", # snowy-rainy
+      "\U000F0599", # sunny
+      "\U000F059D", # windy
+      "\U000F059E", # windy-variant
+      "\U000F14E4", # sunny-off
+      "\U000F050F", # thermometer
+      "\U000F10C3", # thermometer low
+      "\U000F10C2", # thermometer high
+      "\U000F192D", # grid import
+      "\U000F02D1", # mdi-heart
+      "\U000F05F1", # ev-station
+      "\U000F140B", # lightning bolt
+      "\U000F0425", # power
+      "\U000F068A", # shield-home
+      "\U000F02DC", # home
+      "\U000F1A91", # cash-clock
+      "\U000F0F55", # home-thermometer-outline
+      "\U000F18D6", # sun-thermometer
+      ]
+
+### For future use ###
+  # - file: "fonts/materialdesignicons-webfont.ttf"
+  #   id: battery_icons_56
+  #   size: 56
+  #   bpp: 4
+  #   glyphs: [
+  #     "\U000F007A", # mdi-battery-10
+  #     "\U000F007B", # mdi-battery-20
+  #     "\U000F007C", # mdi-battery-30
+  #     "\U000F007D", # mdi-battery-40
+  #     "\U000F007E", # mdi-battery-50
+  #     "\U000F007F", # mdi-battery-60
+  #     "\U000F0080", # mdi-battery-70
+  #     "\U000F0081", # mdi-battery-80
+  #     "\U000F0082", # mdi-battery-90
+  #     "\U000F0079", # mdi-battery (full)
+  #     "\U000F008E", # mdi-battery-outline
+  #     "\U000F0091", # mdi-battery-unknown
+  #     ]
+
+  # NOT USED AT THE MOMENT
+  # - file: "gfonts://Roboto"
+  #   id: roboto20
+  #   size: 20
+  #   bpp: 4
+
+  # - file: "fonts/RobotoCondensed-Regular.ttf"
+  #   id: roboto_36
+  #   size: 36
+  #   bpp: 4
+  #   extras:
+  #     - file: "fonts/materialdesignicons-webfont.ttf"
+  #       glyphs: [
+  #         "\U000F050F", # thermometer
+  #         "\U000F10C3", # thermometer low
+  #         "\U000F10C2", # thermometer high
+  #         "\U000F192D", # grid import
+  #         "\U000F02D1", # mdi-heart
+  #         ]
+
+
+### LVGL Graphics
+lvgl:
+  id: screen
+  log_level: none #INFO
+  buffer_size: 25%
+  # bg_color: my_black
+  # disp_bg_color: my_black
+  disp_bg_image: background
+  color_depth: 16
+  bg_opa: TRANSP
+  default_font: roboto_56
+  style_definitions:
+    - id: date_style
+      text_color: my_white
+      border_color: my_gray
+      radius: 0
+  
+  theme:
+    arc:
+      scroll_on_focus: true
+    slider:
+      scroll_on_focus: true
+    button:
+      bg_color: 0x4D93DD
+      bg_grad_dir: VER
+      bg_opa: COVER
+      border_color: 0x0077b3
+      border_width: 2
+      pressed: # set some button colors to be different in pressed state
+        bg_color: 0xFFD512
+      checked: # set some button colors to be different in checked state
+        bg_color: 0xF53B3B
+        text_color: 0xfff300
+      scroll_on_focus: true
+      text_font: roboto_56
+      text_color: my_white
+      focused:
+        border_color: my_gray
+    label:
+      text_font: roboto_56
+      text_color: my_white
+
+  gradients:
+    - id: color_bar
+      direction: ver
+      dither: none
+      stops:
+        - color: 0x4D93DD
+          position: 0%
+        - color: 0x4BDCE3
+          position: 20%
+        - color: 0xA1EDDE
+          position: 40%
+        - color: 0xEFF2B1
+          position: 60%
+        - color: 0xFFD512
+          position: 80%
+        - color: 0xF53B3B
+          position: 100%
+
+  widgets:
+    - obj: # only using one object
+        align: TOP_LEFT
+        width: 800
+        height: 480
+        pad_all: 6
+        radius: 0
+        # pad_top: 6
+        # pad_left: 8
+        bg_color: my_black
+        bg_opa: 50%
+        border_opa: TRANSP
+        # border_color: my_green ## for testing
+        # border_width: 1  ## for testing
+        layout: # enable the GRID layout 
+          # pad_column: 10 ## for testing
+          type: GRID # split the rows and the columns
+          grid_columns: [FR(80), FR(80), FR(215), FR(85), FR(85), FR(85), FR(85), FR(85),] # 8 columns ~like pixels, plan is a 2x5 columns divided in one 3x5 and one 5x5
+          grid_rows: [FR(3), FR(5), FR(3), FR(3), FR(3)] # 5 rows like percents
+        widgets:
+          # 1st Column 3x5 ## Remeber columns and rows numbering start at 0 
+          - label:
+              id: time_hour
+              grid_cell_row_pos: 0 # 1st row
+              grid_cell_column_pos: 0 # 1st column
+              grid_cell_column_span: 3 # column 0,1,2 span about half the screen (80+80+215)
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F14E4" # Weather icon
+              id: lbl_weather_forecast_condition_icon
+              text_font: icons_100
+              text_align: CENTER
+              grid_cell_row_pos: 1
+              grid_cell_column_pos: 0
+              grid_cell_column_span: 2 # span first 2
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: CENTER
+          - label:
+              text: "Unknown" 
+              id: lbl_weather_forecast_condition_name 
+              text_align: LEFT
+              grid_cell_row_pos: 1
+              grid_cell_column_pos: 2
+              grid_cell_column_span: 2 # span into next side of the screen
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F18D6" # Outdoor temp icon
+              text_align: CENTER
+              grid_cell_row_pos: 2
+              grid_cell_column_pos: 0
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: END
+          - label:
+              id: outdoor_temperature_text
+              text_align: LEFT
+              grid_cell_row_pos: 2
+              grid_cell_column_pos: 1
+              grid_cell_column_span: 2
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F0F55" # Indoor temp icon
+              text_align: CENTER
+              grid_cell_row_pos: 3
+              grid_cell_column_pos: 0
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: END
+          - label:
+              id: indoor_temperature_text
+              text_align: LEFT
+              grid_cell_row_pos: 3
+              grid_cell_column_pos: 1
+              grid_cell_column_span: 2
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F1A85" # Water temp
+              text_align: CENTER
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 0
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: END
+          - label:
+              id: water_temp_text 
+              text_align: LEFT
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 1
+              grid_cell_column_span: 2
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          # 2nd Column 5x5
+          - label:
+              text_font: roboto_46
+              text: "\U000F1A44" # Heat icon
+              text_align: LEFT
+              grid_cell_row_pos: 0
+              grid_cell_column_pos: 3
+              grid_cell_x_align: END
+              grid_cell_y_align: CENTER
+          - label:
+              text_font: roboto_46
+              id: degree_minutes_text 
+              text_align: LEFT
+              grid_cell_row_pos: 0
+              grid_cell_column_pos: 4 #5th column 
+              grid_cell_column_span: 3 #span all the remaning columns
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F02DC" # Home icon
+              text_align: CENTER
+              grid_cell_row_pos: 0
+              grid_cell_column_pos: 7 # all the way to the right
+              grid_cell_x_align: END
+              grid_cell_y_align: CENTER
+          - led:
+              id: led_modbus_alarm # Red LED if the MODBUS Alarm is on
+              align: CENTER
+              color: my_red
+              grid_cell_row_pos: 0
+              grid_cell_column_pos: 6 
+              grid_cell_x_align: END
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F192D" # Grid import icon
+              text_align: LEFT
+              grid_cell_row_pos: 2
+              grid_cell_column_pos: 3 #4th column, starting i the center of the screen
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: END
+          - label:
+              id: nordpool_text
+              text_align: LEFT
+              grid_cell_row_pos: 2
+              grid_cell_column_pos: 4 #5th column 
+              grid_cell_column_span: 4 #span all the remaning columns
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          - label:
+              text: "\U000F140B" # Lightning icon
+              text_align: LEFT
+              grid_cell_row_pos: 3
+              grid_cell_column_pos: 3
+              grid_cell_x_align: CENTER
+              grid_cell_y_align: END
+          - label:
+              id: momentary_active_import_text 
+              text_align: LEFT
+              grid_cell_row_pos: 3
+              grid_cell_column_pos: 4 #5th column 
+              grid_cell_column_span: 4 #span all the remaning columns
+              grid_cell_x_align: START
+              grid_cell_y_align: CENTER
+
+          ## Car heater button 
+          - button:
+              text_align: CENTER
+              grid_cell_row_pos: 4 #5th row, bottom row
+              grid_cell_column_pos: 3 #4th column
+              grid_cell_x_align: STRETCH
+              grid_cell_y_align: STRETCH
+              id: btn_car_heater
+              checkable: true
+              widgets:
+                - label:
+                    # id: lbl_car_heater
+                    align: CENTER
+                    text: "\U000F0FA6" # car-seat-heater
+              on_press:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.carport_car_heater
+
+          ## Outdoor lights button 
+          - button:
+              text_align: CENTER
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 4
+              grid_cell_x_align: STRETCH
+              grid_cell_y_align: STRETCH
+              id: btn_outdoor_lights
+              checkable: true
+              widgets:
+                - label:
+                    # id: lbl_xxxxxxx
+                    align: CENTER
+                    text: "\U000F1054" # outdoor-lamp 
+              on_click:
+                - homeassistant.action:
+                    action: light.toggle
+                    data:
+                      entity_id: light.outdoor_lights
+                      brightness: "100"
+
+          ## Night scene button 
+          - button:
+              text_align: CENTER
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 5
+              grid_cell_x_align: STRETCH
+              grid_cell_y_align: STRETCH
+              id: btn_3
+              # checkable: true
+              widgets:
+                - label:
+                    # id: lbl_xxxxxxx
+                    align: center
+                    text: "\U000F0594" # weather-night
+              on_click:
+                - homeassistant.action:
+                    action: scene.turn_on
+                    data:
+                      entity_id: scene.night
+
+          ## Celing light button 
+          - button:
+              text_align: CENTER
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 6
+              grid_cell_x_align: STRETCH
+              grid_cell_y_align: STRETCH
+              id: btn_4
+              checkable: true
+              widgets:
+                - label:
+                    # id: lbl_xxxxxxx
+                    align: CENTER
+                    text: "\U000F0769" # celing light
+              on_click:
+                - homeassistant.action:
+                    action: light.toggle
+                    data:
+                      entity_id: light.living_room_main_light
+
+          ## Extra hot water from the heat pump 
+          - button:
+              text_align: CENTER
+              grid_cell_row_pos: 4
+              grid_cell_column_pos: 7
+              grid_cell_x_align: STRETCH
+              grid_cell_y_align: STRETCH
+              id: btn_bathtub
+              checkable: true
+              widgets:
+                - label:
+                    id: lbl_bathtub
+                    align: CENTER
+                    text: "\U000F1819" # bathtub outline
+              on_click:
+                - homeassistant.action:
+                    action: select.select_last
+                    data:
+                      entity_id: select.temporary_lux_48132
+
+### Might use for later with climate control ###
+    # - obj:
+    #     align: TOP_RIGHT
+    #     x: 100
+    #     y: 60
+    #     layout:
+    #       type: FLEX
+    #       flex_flow: ROW
+    #       flex_align_cross: CENTER
+    #     width: SIZE_CONTENT
+    #     height: SIZE_CONTENT
+    #     widgets:
+    #       - button:
+    #           id: spin_down
+    #           on_click:
+    #             - lvgl.spinbox.decrement: spinbox_id
+    #           widgets:
+    #             - label:
+    #                   text: "-"
+    #       - spinbox:
+    #           id: spinbox_id
+    #           align: CENTER
+    #           text_align: CENTER
+    #           width: 150
+    #           range_from: 15
+    #           range_to: 35
+    #           step: 0.5
+    #           rollover: false
+    #           digits: 3
+    #           decimal_places: 1
+    #           on_value:
+    #             then:
+    #               - homeassistant.action:
+    #                   action: climate.set_temperature
+    #                   data:
+    #                     temperature: !lambda return x;
+    #                     entity_id: climate.climate_system_s1
+    #       - button:
+    #           id: spin_up
+    #           on_click:
+    #             - lvgl.spinbox.increment: spinbox_id
+    #           widgets:
+    #             - label:
+    #                 text: "+"
+
+### Might use later with the car chargers ### 
+    # - animimg:
+    #     x: 760
+    #     y: 8
+    #     id: niro_charging
+    #     src: [
+    #       batt_empty,
+    #       batt_10,
+    #       batt_20,
+    #       batt_30,
+    #       batt_40,
+    #       batt_50,
+    #       batt_60,
+    #       batt_70,
+    #       batt_80,
+    #       batt_90,
+    #       batt_full
+    #       ]
+    #     duration: 2200ms
+
+    # - animimg:
+    #     x: 760
+    #     y: 60
+    #     id: optima_charging
+    #     src: [
+    #       batt_empty,
+    #       batt_10,
+    #       batt_20,
+    #       batt_30,
+    #       batt_40,
+    #       batt_50,
+    #       batt_60,
+    #       batt_70,
+    #       batt_80,
+    #       batt_90,
+    #       batt_full
+    #       ]
+    #     duration: 2200ms 
+
+
+### Display
+display:
+  - platform: rpi_dpi_rgb
+    id: my_display
+    update_interval: never
+    auto_clear_enabled: false
+    color_order: RGB
+    pclk_frequency: 16MHZ
+    dimensions:
+      width: 800
+      height: 480
+    de_pin:
+      number: 5
+    hsync_pin:
+      number: 46
+      ignore_strapping_warning: true
+    vsync_pin:
+      number: 3
+      ignore_strapping_warning: true
+    pclk_pin: 7
+    pclk_inverted: true
+    reset_pin:
+      ch422g: ch422g_hub
+      number: 3
+#    enable_pin:
+#      ch422g: ch422g_hub
+#      number: 2  
+    hsync_back_porch: 8
+    hsync_front_porch: 8
+    hsync_pulse_width: 4
+    vsync_back_porch: 16
+    vsync_front_porch: 16
+    vsync_pulse_width: 4
+    data_pins:
+      red:
+        - 1         #r3
+        - 2         #r4
+        - 42        #r5
+        - 41        #r6
+        - 40        #r7
+      blue:
+        - 14        #b3
+        - 38        #b4
+        - 18        #b5
+        - 17        #b6
+        - 10        #b7
+      green:
+        - 39        #g2
+        - 0         #g3
+        - 45        #g4
+        - 48        #g5
+        - 47        #g6
+        - 21        #g7
+
+### Touchscreen
+touchscreen:
+  platform: gt911
+  id: my_touch
+  interrupt_pin: GPIO4
+  reset_pin:
+    ch422g: ch422g_hub
+    number: 1
+    mode: OUTPUT
+  on_touch:
+    - lambda: |-
+        ESP_LOGI("Touch", "Touch detected at x=%d, y=%d", touch.x, touch.y);
+  on_update:
+    - lambda: |-
+          for (auto touch: touches)  {
+              if (touch.state <= 2) {
+                ESP_LOGI("Touch points:", "id=%d x=%d, y=%d x.raw=%d, y.raw=%d", touch.id, touch.x, touch.y, touch.x_raw, touch.y_raw);
+              }
+          }  
+  on_release:
+    then:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
