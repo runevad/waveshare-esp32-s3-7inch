@@ -85,12 +85,13 @@ captive_portal:
 ch422g:
   - id: ch422g_hub
 
+### Restart unit
+button:
+- platform: restart
+  name: $friendly_name Restart
+
 ### Switch
 switch:
-  - platform: restart
-    name: "Restart"
-    id: device_restart
-  
   - platform: safe_mode
     name: Use Safe Mode
     id: device_safe_mode
@@ -280,6 +281,17 @@ binary_sensor:
       then:
         lvgl.widget.update:
           id: btn_outdoor_lights
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    id: living_room_main_light
+    entity_id: light.living_room_main_light
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: btn_living_room_main_light
           state:
             checked: !lambda return x;
 
@@ -825,7 +837,7 @@ lvgl:
               grid_cell_column_pos: 6
               grid_cell_x_align: STRETCH
               grid_cell_y_align: STRETCH
-              id: btn_4
+              id: btn_living_room_main_light
               checkable: true
               widgets:
                 - label:
