@@ -206,11 +206,22 @@ sensor:
     id: nordpool_price
     entity_id: sensor.nordpool_spot
     on_value:
-      - lvgl.label.update:
-          id: nordpool_text
-          text:
-            format: "%.0f öre/kWh"
-            args: [ 'x' ]
+      then:
+        - if:
+            condition:
+              lambda: 'return id(nordpool_price).state < 99;'
+            then:
+              - lvgl.label.update:
+                  id: nordpool_text
+                  text:
+                    format: "%.0f öre/kWh"
+                    args: [ 'x' ]
+            else:
+              - lvgl.label.update:
+                  id: nordpool_text
+                  text:
+                    format: "#F53B3B %.0f öre/kWh#"
+                    args: [ 'x' ]
 
   ## Power usage
   - platform: homeassistant
@@ -231,7 +242,7 @@ sensor:
       - lvgl.label.update:
           id: compressor_frequency_text
           text:
-            format: "\U000F1A44 %.0f Hz"
+            format: "\U000F1A43 %.0f Hz"
             args: [ 'x' ]
 
   ## Heat pump inverter temperature
@@ -250,22 +261,44 @@ sensor:
     id: supply_temperature
     entity_id: sensor.bt2_supply_temp_s1_40008
     on_value:
-      - lvgl.label.update:
-          id: supply_temp_text
-          text:
-            format: "\U000F0F9C %.1f °C"
-            args: [ 'x' ]
+      then:
+        - if:
+            condition:
+              binary_sensor.is_on: hot_water_production
+            then:
+              - lvgl.label.update:
+                  id: supply_temp_text
+                  text:
+                    format: "\U000F1A85 %.1f °C"
+                    args: [ 'x' ]
+            else:
+              - lvgl.label.update:
+                  id: supply_temp_text
+                  text:
+                    format: "\U000F0F9C %.1f °C"
+                    args: [ 'x' ]
 
   ## Return temperature
   - platform: homeassistant
     id: return_temperature
     entity_id: sensor.eb100_ep14_bt3_return_temp_40012
     on_value:
-      - lvgl.label.update:
-          id: return_temp_text
-          text:
-            format: "\U000F0F9B %.1f °C"
-            args: [ 'x' ]
+      then:
+        - if:
+            condition:
+              binary_sensor.is_on: hot_water_production
+            then:
+              - lvgl.label.update:
+                  id: return_temp_text
+                  text:
+                    format: "\U000F1A85 %.1f °C"
+                    args: [ 'x' ]
+            else:
+              - lvgl.label.update:
+                  id: return_temp_text
+                  text:
+                    format: "\U000F0F9B %.1f °C"
+                    args: [ 'x' ]
 
   ## Brine In temperature
   - platform: homeassistant
@@ -275,7 +308,7 @@ sensor:
       - lvgl.label.update:
           id: brine_in_temp_text
           text:
-            format: "\U000F0E03 %.1f °C"
+            format: "\U000F0DA3 %.1f °C"
             args: [ 'x' ]
 
   ## Brine Out temperature
@@ -286,10 +319,10 @@ sensor:
       - lvgl.label.update:
           id: brine_out_temp_text
           text:
-            format: "\U000F0E02 %.1f °C"
+            format: "\U000F0DA1 %.1f °C"
             args: [ 'x' ]
 
-  ## Degree minutes (heat demand in the house) F1AAF
+  ## Degree minutes (heat demand in the house) F1A45
   - platform: homeassistant
     id: degree_minutes
     entity_id: number.degree_minutes_16_bit_43005
@@ -297,7 +330,7 @@ sensor:
       - lvgl.label.update:
           id: degree_minutes_text
           text:
-            format: "\U000F1AAF %.0f DM"
+            format: "\U000F1A45 %.0f DM"
             args: [ 'x' ]
 
   ## Water temperature
@@ -398,6 +431,12 @@ binary_sensor:
           id: led_modbus_alarm
           color: my_green
 
+  ## Hot water production
+  - platform: homeassistant
+    id: hot_water_production
+    entity_id: binary_sensor.hot_water_production
+    publish_initial_state: true
+
 ### Text sensors ## Not used
 # text_sensor:
 #   - platform: wifi_info
@@ -424,7 +463,7 @@ text:
 
 ### Images
 image:
-  - file: "images/background.png"
+  - file: "images/house.png"
     id: background
     # resize: 480x320
     type: RGB565
@@ -486,29 +525,21 @@ font:
           "\U000F068A", # shield-home
           "\U000F02DC", # home
           "\U000F1A91", # cash-clock
-          "\U000F0F55", # home-thermometer-outline
+          "\U000F0F54", # home-thermometer
           "\U000F18D6", # sun-thermometer
-          "\U000F1819", # bathtub-outline
           "\U000F1818", # bathtub
-          "\U000F1A44", # heat-pump-outline
+          "\U000F1A43", # heat-pump
           "\U000F0335", # lightbulb
           "\U000F0336", # lightbulb_off
           "\U000F0769", # ceiling_light
-          "\U000F06B5", # lamp   
-          "\U000F08DD", # floor_lamp   
-          "\U000F12BA", # string_lights  
-          "\U000F0914", # track_light 
-          "\U000F1A2F", # bulkhead_light 
-          "\U000F07D6", # led_strip
-          "\U000F1020", # coach_lamp
-          "\U000F1798", # ceiling_fan_light
           "\U000F0FA6", # car-seat-heater
-          "\U000F0594", # weather-night
           "\U000F1054", # outdoor-lamp 
           "\U000F1A85", # water-thermometer 
-          "\U000F1AAF", # heating-coil
+          "\U000F1A45", # heat-wave
           "\U000F0E02", # thermometer-chevron-down
+          "\U000F0DA1", # transfer-down
           "\U000F0E03", # thermometer-chevron-up
+          "\U000F0DA3", # transfer-up
           "\U000F0F9C", # home-import-outline
           "\U000F0F9B", # home-export-outline
           "\U000F0510", # thermometer-lines
@@ -535,29 +566,21 @@ font:
           "\U000F068A", # shield-home
           "\U000F02DC", # home
           "\U000F1A91", # cash-clock
-          "\U000F0F55", # home-thermometer-outline
+          "\U000F0F54", # home-thermometer
           "\U000F18D6", # sun-thermometer
-          "\U000F1819", # bathtub-outline
           "\U000F1818", # bathtub
-          "\U000F1A44", # heat-pump-outline
+          "\U000F1A43", # heat-pump
           "\U000F0335", # lightbulb
           "\U000F0336", # lightbulb_off
           "\U000F0769", # ceiling_light
-          "\U000F06B5", # lamp   
-          "\U000F08DD", # floor_lamp   
-          "\U000F12BA", # string_lights  
-          "\U000F0914", # track_light 
-          "\U000F1A2F", # bulkhead_light 
-          "\U000F07D6", # led_strip
-          "\U000F1020", # coach_lamp
-          "\U000F1798", # ceiling_fan_light
           "\U000F0FA6", # car-seat-heater
-          "\U000F0594", # weather-night
           "\U000F1054", # outdoor-lamp 
           "\U000F1A85", # water-thermometer
-          "\U000F1AAF", # heating-coil 
+          "\U000F1A45", # heat-wave 
           "\U000F0E02", # thermometer-chevron-down
+          "\U000F0DA1", # transfer-down
           "\U000F0E03", # thermometer-chevron-up
+          "\U000F0DA3", # transfer-up
           "\U000F0F9C", # home-import-outline
           "\U000F0F9B", # home-export-outline
           "\U000F0510", # thermometer-lines
@@ -641,11 +664,12 @@ lvgl:
   bg_opa: TRANSP
   default_font: roboto_56
   style_definitions:
-    - id: date_style
+    - id: standard_style
       text_color: my_white
-      border_color: my_gray
+      border_color: my_green
       radius: 0
-  
+      outline_width: 1 ## for testing the grid, comment out when done
+
   theme:
     arc:
       scroll_on_focus: true
@@ -690,6 +714,8 @@ lvgl:
           position: 100%
 
 ## Widgets spaced in a 8x5 grid
+
+
   widgets:
     - obj: ## one big object first
         align: TOP_LEFT
@@ -712,7 +738,7 @@ lvgl:
         widgets:
           # 1st Column 3x5 ## Remeber columns and rows numbering start at 0 
           - label:
-              id: time_hour
+              id: homeassistant_time_text
               pad_left: 15
               grid_cell_row_pos: 0 # 1st row
               grid_cell_column_pos: 0 # 1st column
@@ -757,7 +783,7 @@ lvgl:
               grid_cell_y_align: CENTER
 
           - label:
-              text: "\U000F0F55" # Indoor temp icon
+              text: "\U000F0F54" # Indoor temp icon
               text_align: CENTER
               grid_cell_row_pos: 3
               grid_cell_column_pos: 0
@@ -788,10 +814,10 @@ lvgl:
               grid_cell_x_align: START
               grid_cell_y_align: CENTER
 
-          # 2nd Column 5x5 ## Empty and replaced with small texts below
+          # 2nd Column 5x5 ## First row is empty and replaced with small texts below in a second object
           # - label:
           #     text_font: roboto_28
-          #     text: "\U000F1A44" # Compressor icon
+          #     text: "\U000F1A43" # Compressor icon
           #     text_align: LEFT
           #     grid_cell_row_pos: 0
           #     grid_cell_column_pos: 3
@@ -806,14 +832,13 @@ lvgl:
           #     grid_cell_column_span: 3 #span all the remaning columns
           #     grid_cell_x_align: START
           #     grid_cell_y_align: CENTER
-
-          - label:
-              text: "\U000F02DC" # Home icon
-              text_align: CENTER
-              grid_cell_row_pos: 0
-              grid_cell_column_pos: 3 # all the way to the right
-              grid_cell_x_align: CENTER
-              grid_cell_y_align: CENTER
+          # - label:
+          #     text: "\U000F02DC" # Home icon
+          #     text_align: CENTER
+          #     grid_cell_row_pos: 0
+          #     grid_cell_column_pos: 3 # all the way to the right
+          #     grid_cell_x_align: CENTER
+          #     grid_cell_y_align: CENTER
           - led:
               id: led_modbus_alarm # Red LED if the MODBUS Alarm is on
               align: CENTER
@@ -848,6 +873,7 @@ lvgl:
               grid_cell_y_align: END
           - label:
               id: nordpool_text
+              recolor: true # to color text when the electricity price is high
               text_align: LEFT
               grid_cell_row_pos: 3
               grid_cell_column_pos: 4 #5th row, bottom row
@@ -944,15 +970,20 @@ lvgl:
               grid_cell_x_align: STRETCH
               grid_cell_y_align: STRETCH
               id: btn_bathtub
-              checkable: true
+              # checkable: true #only chage when it gets it from home assistant, not from the LVGL-panel
               widgets:
                 - label:
                     id: lbl_bathtub
                     align: CENTER
-                    text: "\U000F1819" # bathtub outline
+                    text: "\U000F1818" # bathtub
               on_long_press:
                 - homeassistant.action:
-                    action: select.select_last
+                    action: select.select_last # a one time increase of the hot water temperature to 55 degrees C
+                    data:
+                      entity_id: select.temporary_lux_48132
+              on_press:
+                - homeassistant.action:
+                    action: select.select_first # selects OFF in the list, heat pumps goes back to normal operation (45-48 degrees)
                     data:
                       entity_id: select.temporary_lux_48132
 
