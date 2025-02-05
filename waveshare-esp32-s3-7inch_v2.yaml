@@ -657,7 +657,7 @@ lvgl:
   id: screen
   log_level: none #INFO
   buffer_size: 25%
-  # bg_color: my_black
+  # bg_color: my_gray
   # disp_bg_color: my_black
   disp_bg_image: background
   color_depth: 16
@@ -666,9 +666,7 @@ lvgl:
   style_definitions:
     - id: standard_style
       text_color: my_white
-      border_color: my_green
       radius: 0
-      outline_width: 1 ## for testing the grid, comment out when done
 
   theme:
     arc:
@@ -692,6 +690,7 @@ lvgl:
       focused:
         border_color: my_gray
     label:
+      # outline_width: 1 ## for testing the grid, comment out when done
       text_font: roboto_56
       text_color: my_white
 
@@ -714,8 +713,6 @@ lvgl:
           position: 100%
 
 ## Widgets spaced in a 8x5 grid
-
-
   widgets:
     - obj: ## one big object first
         align: TOP_LEFT
@@ -723,23 +720,18 @@ lvgl:
         height: 480
         pad_all: 6
         radius: 0
-        # pad_top: 6
-        # pad_left: 8
         bg_color: my_black
         bg_opa: 50%
         border_opa: TRANSP
-        # border_color: my_green ## for testing
-        # border_width: 1  ## for testing
         layout: # enable the GRID layout 
-          # pad_column: 10 ## for testing
           type: GRID # split the rows and the columns
           grid_columns: [FR(80), FR(80), FR(225), FR(83), FR(83), FR(83), FR(83), FR(83),] # 8 columns divided in pixels, plan is a 2x5 columns divided in one 3x5 and one 5x5
-          grid_rows: [FR(85), FR(146), FR(83), FR(83), FR(83)] # 5 rows like percents
+          grid_rows: [FR(85), FR(146), FR(83), FR(83), FR(83)] # 5 rows divided in pixels
         widgets:
           # 1st Column 3x5 ## Remeber columns and rows numbering start at 0 
           - label:
               id: homeassistant_time_text
-              pad_left: 15
+              pad_left: 12
               grid_cell_row_pos: 0 # 1st row
               grid_cell_column_pos: 0 # 1st column
               grid_cell_column_span: 3 # column 0,1,2 span about half the screen (80+80+215)
@@ -769,10 +761,11 @@ lvgl:
           - label:
               text: "\U000F18D6" # Outdoor temp icon
               text_align: CENTER
+              pad_top: 5
               grid_cell_row_pos: 2
               grid_cell_column_pos: 0
               grid_cell_x_align: CENTER
-              grid_cell_y_align: END
+              grid_cell_y_align: CENTER
           - label:
               id: outdoor_temperature_text
               text_align: LEFT
@@ -785,10 +778,11 @@ lvgl:
           - label:
               text: "\U000F0F54" # Indoor temp icon
               text_align: CENTER
+              pad_top: 5
               grid_cell_row_pos: 3
               grid_cell_column_pos: 0
               grid_cell_x_align: CENTER
-              grid_cell_y_align: END
+              grid_cell_y_align: CENTER
           - label:
               id: indoor_temperature_text
               text_align: LEFT
@@ -801,10 +795,11 @@ lvgl:
           - label:
               text: "\U000F1A85" # Water temp
               text_align: CENTER
+              pad_top: 5
               grid_cell_row_pos: 4
               grid_cell_column_pos: 0
               grid_cell_x_align: CENTER
-              grid_cell_y_align: END
+              grid_cell_y_align: CENTER
           - label:
               id: water_temp_text 
               text_align: LEFT
@@ -834,7 +829,7 @@ lvgl:
           #     grid_cell_y_align: CENTER
           # - label:
           #     text: "\U000F02DC" # Home icon
-          #     text_align: CENTER
+          #     pad_top: 4
           #     grid_cell_row_pos: 0
           #     grid_cell_column_pos: 3 # all the way to the right
           #     grid_cell_x_align: CENTER
@@ -850,11 +845,12 @@ lvgl:
 
           - label:
               text: "\U000F140B" # Lightning icon
-              text_align: LEFT
+              text_align: CENTER
+              pad_top: 5
               grid_cell_row_pos: 2
               grid_cell_column_pos: 3
               grid_cell_x_align: CENTER
-              grid_cell_y_align: END
+              grid_cell_y_align: CENTER
           - label:
               id: momentary_active_import_text 
               text_align: LEFT
@@ -866,11 +862,12 @@ lvgl:
 
           - label:
               text: "\U000F192D" # Grid import icon
-              text_align: LEFT
+              text_align: CENTER
+              pad_top: 5
               grid_cell_row_pos: 3
               grid_cell_column_pos: 3 #4th column, starting i the center of the screen
               grid_cell_x_align: CENTER
-              grid_cell_y_align: END
+              grid_cell_y_align: CENTER
           - label:
               id: nordpool_text
               recolor: true # to color text when the electricity price is high
@@ -893,6 +890,7 @@ lvgl:
               widgets:
                 - label:
                     # id: lbl_xxxxxxx
+                    pad_top: 4
                     align: CENTER
                     text: "\U000F0769" # celing light
               on_click:
@@ -913,6 +911,7 @@ lvgl:
               widgets:
                 - label:
                     # id: lbl_xxxxxxx
+                    pad_top: 4
                     align: CENTER
                     text: "\U000F1054" # outdoor-lamp 
               on_click:
@@ -934,6 +933,7 @@ lvgl:
               widgets:
                 - label:
                     # id: lbl_xxxxxxx
+                    pad_top: 4
                     align: center
                     text: "\U000F1402" # pump
               on_press:
@@ -954,6 +954,7 @@ lvgl:
               widgets:
                 - label:
                     # id: lbl_car_heater
+                    pad_top: 4
                     align: CENTER
                     text: "\U000F0FA6" # car-seat-heater
               on_press:
@@ -974,6 +975,7 @@ lvgl:
               widgets:
                 - label:
                     id: lbl_bathtub
+                    pad_top: 4
                     align: CENTER
                     text: "\U000F1818" # bathtub
               on_long_press:
@@ -991,7 +993,7 @@ lvgl:
         align: TOP_RIGHT
         width: 280 ## 
         height: 200 ##  
-        pad_all: 6
+        pad_all: 5
         radius: 0
         bg_color: my_black
         bg_opa: TRANSP # complete transparent since this is ontop of the first object
@@ -1081,7 +1083,7 @@ lvgl:
     #       - spinbox:
     #           id: spinbox_id
     #           align: CENTER
-    #           text_align: CENTER
+    #           # text_align: CENTER
     #           width: 150
     #           range_from: 15
     #           range_to: 35
