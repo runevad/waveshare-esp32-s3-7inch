@@ -26,6 +26,8 @@ esp32:
   flash_size: 8MB
   framework:
     type: esp-idf
+    advanced:
+      enable_idf_experimental_features: true
     sdkconfig_options:
       COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
