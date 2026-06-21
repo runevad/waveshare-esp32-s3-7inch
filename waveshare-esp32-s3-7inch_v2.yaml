@@ -24,6 +24,7 @@ esp32:
   board: esp32-s3-devkitc-1
   variant: ESP32S3
   flash_size: 8MB
+  cpu_frequency: 240MHZ
   framework:
     type: esp-idf
     advanced:
@@ -56,22 +57,25 @@ logger:
 ### Enable Home Assistant API
 api:
   encryption:
-    key: "01234567891011121314151617181920212223242526"
+    key: "mnHBqp8d48U92vFZJXF/rgjG3UPZCl4oFzWzh+Ns5PQ="
 
 ota:
   - platform: esphome
     password: !secret ota_password
 
 wifi:
+  power_save_mode: none
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "Waveshare-Esp32-S3-7Inch"
-    password: !secret ota_password
+### Not used 
+  # # Enable fallback hotspot (captive portal) in case wifi connection fails
+  # ap:
+  #   ssid: "Waveshare-Esp32-S3-7Inch"
+  #   password: "08E2bSJZMQzw"
 
-captive_portal:
+### Not used ##
+# captive_portal:
 
 ### Web Server
 # web_server:
@@ -97,7 +101,7 @@ switch:
   - platform: safe_mode
     name: Use Safe Mode
     id: device_safe_mode
-    
+
   - platform: gpio
     id: lcdbacklight
     name: lcdbacklight
@@ -135,30 +139,34 @@ switch:
 ### Time
 time:
   - platform: homeassistant
-    id: esptime
+    id: homeassistant_time
     on_time:
       - minutes: "*"
         then:
           - lvgl.label.update:
-              id: time_hour
+              id: homeassistant_time_text
               text:
                 time_format: "%A %H:%M"
-                time: !lambda return id(esptime).now();
+                time: !lambda return id(homeassistant_time).now();
 
   - platform: homeassistant
     id: antiburn_time
     on_time:
-      - hours: 2,3,4,5
+      - hours: 1,2,3,4,5
         minutes: 5
         seconds: 0
         then:
           - switch.turn_on: switch_antiburn
-          - switch.turn_off: lcdbacklight
-      - hours: 2,3,4,5
+      - hours: 1,2,3,4,5
         minutes: 35
         seconds: 0
         then:
           - switch.turn_off: switch_antiburn
+      - hours: 1
+        minutes: 0
+        seconds: 0
+        then:
+            - switch.turn_off: lcdbacklight
       - hours: 5
         minutes: 50
         seconds: 0
@@ -195,13 +203,46 @@ sensor:
   ## Outdoor temperature
   - platform: homeassistant
     id: outdoor_temperature
-    entity_id: sensor.outdoor_temperature
+    entity_id: sensor.temperatur_punkt_nu
     on_value:
       - lvgl.label.update:
           id: outdoor_temperature_text
           text:
             format: "%.1f °C"
             args: [ 'x' ]
+
+  # ## Rain sensor
+  # - platform: homeassistant
+  #   id: rain_sensor
+  #   entity_id: sensor.wemos_d1_hydreon_rain_intensity
+  #   on_value:
+  #     - lvgl.label.update:
+  #         id: rain_sensor_text
+  #         text:
+  #           format: "%.1f mm/h"
+  #           args: [ 'x' ]
+  # 
+  # ## FEV Rörligt pris
+  # - platform: homeassistant
+  #   id: fev_rorligt_price
+  #   entity_id: sensor.fev_rorligt_totalt
+  #   on_value:
+  #     then:
+  #       - if:
+  #           condition:
+  #             lambda: 'return id(fev_rorligt_price).state < 1.5;'
+  #           then:
+  #             - lvgl.label.update:
+  #                 id: fev_rorligt_text
+  #                 text:
+  #                   format: "%.1f kr/kWh"
+  #                   args: [ 'x' ]
+  #           else:
+  #             - lvgl.label.update:
+  #                 id: fev_rorligt_text
+  #                 text:
+  #                   format: "#F53B3B %.1f kr/kWh#"
+  #                   args: [ 'x' ]
 
   ## Nordpool
   - platform: homeassistant
@@ -210,19 +251,21 @@ sensor:
     on_value:
       then:
         - if:
+            # condition:
+            #   lambda: 'return id(nordpool_price).state < 99;'
             condition:
-              lambda: 'return id(nordpool_price).state < 99;'
+              binary_sensor.is_on: binary_effekttaxa
             then:
               - lvgl.label.update:
                   id: nordpool_text
                   text:
-                    format: "%.0f öre/kWh"
+                    format: "#F53B3B %.0f öre/kWh#"
                     args: [ 'x' ]
             else:
               - lvgl.label.update:
                   id: nordpool_text
                   text:
-                    format: "#F53B3B %.0f öre/kWh#"
+                    format: "%.0f öre/kWh"
                     args: [ 'x' ]
 
   ## Power usage
@@ -230,11 +273,44 @@ sensor:
     id: momentary_active_import
     entity_id: sensor.momentary_active_import_w
     on_value:
-      - lvgl.label.update:
-          id: momentary_active_import_text
-          text:
-            format: "%.0f W"
-            args: [ 'x' ]
+      then:
+        - if:
+            # condition:
+            #   lambda: 'return id(nordpool_price).state < 99;'
+            condition:
+              binary_sensor.is_on: binary_effekttaxa
+            then:
+              - lvgl.label.update:
+                  id: momentary_active_import_text
+                  text:
+                    format: "#F53B3B %.0f W#"
+                    args: [ 'x' ]
+            else:
+              - lvgl.label.update:
+                  id: momentary_active_import_text
+                  text:
+                    format: "%.0f W"
+                    args: [ 'x' ]
+
+
+
+    # on_value:
+    #   - lvgl.label.update:
+    #       id: momentary_active_import_text
+    #       text:
+    #         format: "%.0f W"
+    #         args: [ 'x' ]
+
+  # - platform: homeassistant
+  #   id: heat_pump_meter_power
+  #   entity_id: sensor.heat_pump_meter_power
+  #   on_value:
+  #     - lvgl.label.update:
+  #         id: heat_pump_meter_power_import_text
+  #         text:
+  #           format: "%.0f W"
+  #           args: [ 'x' ]
+
 
   ## Heat pump compressor frequency
   - platform: homeassistant
@@ -346,6 +422,17 @@ sensor:
             format: "%.1f °C"
             args: [ 'x' ]
 
+  # - platform: homeassistant
+  #   id: daily_water
+  #   entity_id: sensor.daily_water_2
+  #   on_value:
+  #     - lvgl.label.update:
+  #         id: daily_water_text
+  #         text:
+  #           format: "%.0f L"
+  #           args: [ 'x' ]
+
+
   ## NOT IN USE ##
   # Climate control
   # - platform: homeassistant
@@ -361,6 +448,12 @@ sensor:
 binary_sensor:
   - platform: status
     name: Status sensor
+
+  ## Extra hot water
+  - platform: homeassistant
+    id: binary_effekttaxa
+    entity_id: binary_sensor.effekttaxa
+    publish_initial_state: true
 
   ## Extra hot water
   - platform: homeassistant
@@ -465,9 +558,8 @@ text:
 
 ### Images
 image:
-  - file: "images/house.png"
+  - file: "dp_background.png"
     id: background
-    # resize: 480x320
     type: RGB565
 
 ### Colors
@@ -658,18 +750,23 @@ font:
 lvgl:
   id: screen
   log_level: none #INFO
-  buffer_size: 25%
+  buffer_size: 12%
   # bg_color: my_gray
   # disp_bg_color: my_black
-  disp_bg_image: background
   color_depth: 16
-  bg_opa: TRANSP
   default_font: roboto_56
   style_definitions:
     - id: standard_style
       text_color: my_white
       radius: 0
-
+  bottom_layer:
+    widgets:
+      - obj:
+          width: 100%
+          height: 100%
+          bg_image_src: background
+          bg_image_opa: cover
+          bg_opa: 30%
   theme:
     arc:
       scroll_on_focus: true
@@ -855,6 +952,7 @@ lvgl:
               grid_cell_y_align: CENTER
           - label:
               id: momentary_active_import_text 
+              recolor: true # to color text when the electricity price is high
               text_align: LEFT
               grid_cell_row_pos: 2
               grid_cell_column_pos: 4 #5th column 
@@ -1150,7 +1248,8 @@ lvgl:
 
 ### Display
 display:
-  - platform: rpi_dpi_rgb
+  - platform: mipi_rgb
+    model: ESP32-S3-TOUCH-LCD-7-800X480
     id: my_display
     update_interval: never
     auto_clear_enabled: false
